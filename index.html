@@ -1,0 +1,1041 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>USB 摄像头监控</title>
+
+    <!-- PWA Meta Tags -->
+    <meta name="description" content="Type-C USB 摄像头监控应用，支持拍照、录像及媒体管理">
+    <meta name="theme-color" content="#6c5ce7">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="USB摄像头">
+    <link rel="manifest" href="./manifest.json">
+    <link rel="icon" type="image/png" sizes="32x32" href="./icons/favicon-32.png">
+    <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
+    <style>
+        :root {
+            --bg: #0f0f14;
+            --surface: #1a1a24;
+            --surface2: #24243a;
+            --border: #2a2a40;
+            --text: #e0e0e0;
+            --text2: #9090a8;
+            --accent: #6c5ce7;
+            --accent2: #a29bfe;
+            --danger: #e74c3c;
+            --danger2: #ff6b6b;
+            --success: #00b894;
+            --warning: #fdcb6e;
+            --radius: 12px;
+            --radius-sm: 8px;
+            --shadow: 0 4px 24px rgba(0,0,0,0.4);
+            --transition: 0.25s cubic-bezier(0.4, 0, 0.2, 1);
+        }
+
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC', 'Microsoft YaHei', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            min-height: 100vh;
+            overflow-x: hidden;
+        }
+
+        /* Header */
+        .header {
+            background: var(--surface);
+            border-bottom: 1px solid var(--border);
+            padding: 10px 20px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 16px;
+            position: sticky;
+            top: 0;
+            z-index: 100;
+            backdrop-filter: blur(12px);
+        }
+        .header-left {
+            display: flex; align-items: center; gap: 10px;
+            min-width: 0; flex: 1 1 auto;
+        }
+        .header-left > div:last-child {
+            min-width: 0;
+        }
+        .logo {
+            width: 34px; height: 34px; flex-shrink: 0;
+            background: linear-gradient(135deg, var(--accent), var(--accent2));
+            border-radius: var(--radius-sm);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 16px;
+        }
+        .header h1 {
+            font-size: 16px; font-weight: 600; letter-spacing: -0.3px;
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .status-dot {
+            width: 7px; height: 7px; border-radius: 50%; background: var(--text2);
+            flex-shrink: 0;
+            transition: var(--transition);
+        }
+        .status-dot.active { background: var(--success); box-shadow: 0 0 8px var(--success); }
+        .status-dot.error { background: var(--danger); box-shadow: 0 0 8px var(--danger); }
+        .status-text {
+            font-size: 12px; color: var(--text2);
+            white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+        }
+        .header-actions {
+            display: flex; align-items: center; gap: 10px;
+            flex-shrink: 0;
+        }
+        .device-count-text {
+            font-size: 11px; color: var(--text2);
+            white-space: nowrap;
+            background: var(--surface2);
+            padding: 3px 10px; border-radius: 10px;
+        }
+
+        /* Main layout */
+        .main-container {
+            display: flex;
+            gap: 20px;
+            padding: 20px 24px;
+            max-width: 1400px;
+            margin: 0 auto;
+            height: calc(100vh - 130px);
+        }
+
+        /* Video panel */
+        .video-panel {
+            flex: 1;
+            min-width: 0;
+            display: flex;
+            flex-direction: column;
+            gap: 14px;
+        }
+
+        .camera-selector {
+            display: flex; gap: 10px; align-items: center;
+        }
+        .camera-selector label {
+            font-size: 12px; color: var(--accent2); font-weight: 600; white-space: nowrap;
+            letter-spacing: 0.5px;
+        }
+        .camera-selector select {
+            flex: 1;
+            padding: 10px 14px;
+            background: var(--surface2);
+            border: 1px solid var(--accent);
+            border-radius: var(--radius-sm);
+            color: var(--text);
+            font-size: 14px;
+            cursor: pointer;
+            outline: none;
+            transition: var(--transition);
+            font-weight: 500;
+        }
+        .camera-selector select:focus { border-color: var(--accent2); box-shadow: 0 0 0 3px rgba(108,92,231,0.25); }
+        .btn-refresh {
+            width: 40px; height: 40px; flex-shrink: 0;
+            background: var(--surface2); border: 1px solid var(--border);
+            border-radius: var(--radius-sm); color: var(--text); cursor: pointer;
+            font-size: 18px; display: flex; align-items: center; justify-content: center;
+            transition: var(--transition);
+        }
+        .btn-refresh:hover { background: var(--accent); border-color: var(--accent); }
+        .btn-refresh:active { transform: scale(0.95); }
+
+        .video-wrapper {
+            position: relative;
+            flex: 1;
+            background: #000;
+            border-radius: var(--radius);
+            overflow: hidden;
+            border: 1px solid var(--border);
+            box-shadow: var(--shadow);
+            min-height: 300px;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .video-wrapper video {
+            width: 100%; height: 100%; object-fit: contain;
+        }
+        .no-camera-overlay {
+            position: absolute; inset: 0;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            gap: 16px; color: var(--text2);
+        }
+        .no-camera-overlay .icon { font-size: 64px; opacity: 0.4; }
+        .no-camera-overlay .hint { font-size: 15px; text-align: center; line-height: 1.6; }
+
+        /* Active camera badge */
+        .active-camera-badge {
+            position: absolute; top: 16px; left: 16px;
+            padding: 6px 14px; border-radius: 20px;
+            background: rgba(0,0,0,0.65); backdrop-filter: blur(8px);
+            font-size: 13px; font-weight: 600; color: #fff;
+            z-index: 5; pointer-events: none;
+            transition: var(--transition);
+        }
+
+        /* Flash effect */
+        .flash {
+            position: absolute; inset: 0;
+            background: #fff; opacity: 0; pointer-events: none;
+            transition: opacity 0.08s ease;
+            z-index: 5;
+        }
+        .flash.active { opacity: 1; }
+
+        /* Recording indicator */
+        .rec-indicator {
+            position: absolute; top: 16px; right: 16px;
+            display: flex; align-items: center; gap: 8px;
+            padding: 6px 14px; border-radius: 20px;
+            background: rgba(0,0,0,0.65); backdrop-filter: blur(8px);
+            font-size: 13px; font-weight: 600;
+            opacity: 0; transform: translateY(-10px);
+            transition: var(--transition);
+            z-index: 5;
+            pointer-events: none;
+        }
+        .rec-indicator.visible { opacity: 1; transform: translateY(0); }
+        .rec-dot {
+            width: 10px; height: 10px; border-radius: 50%; background: var(--danger);
+            animation: rec-pulse 1s infinite;
+        }
+        @keyframes rec-pulse {
+            0%, 100% { opacity: 1; transform: scale(1); }
+            50% { opacity: 0.5; transform: scale(1.2); }
+        }
+        .rec-time { color: #fff; font-variant-numeric: tabular-nums; }
+
+        /* Controls */
+        .controls {
+            display: flex; gap: 12px; justify-content: center; align-items: center;
+        }
+        .btn {
+            padding: 10px 22px; border-radius: 24px; border: none;
+            font-size: 14px; font-weight: 600; cursor: pointer;
+            display: flex; align-items: center; gap: 8px;
+            transition: var(--transition); outline: none;
+            white-space: nowrap;
+        }
+        .btn:active { transform: scale(0.96); }
+        .btn-photo {
+            width: 56px; height: 56px; border-radius: 50%; padding: 0;
+            background: #fff; border: 4px solid var(--surface2);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 22px; flex-shrink: 0;
+            box-shadow: 0 2px 12px rgba(255,255,255,0.15);
+        }
+        .btn-photo:hover { border-color: var(--accent2); transform: scale(1.05); }
+        .btn-photo:disabled { opacity: 0.4; cursor: not-allowed; transform: none; }
+        .btn-record {
+            background: var(--danger); color: #fff;
+            width: 56px; height: 56px; border-radius: 50%; padding: 0;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 22px; flex-shrink: 0;
+            box-shadow: 0 2px 16px rgba(231,76,60,0.4);
+        }
+        .btn-record.recording {
+            background: #fff; color: var(--danger);
+            animation: rec-btn-pulse 1.5s infinite;
+        }
+        @keyframes rec-btn-pulse {
+            0%, 100% { box-shadow: 0 2px 16px rgba(231,76,60,0.4); }
+            50% { box-shadow: 0 2px 32px rgba(231,76,60,0.7); }
+        }
+        .btn-record:hover { transform: scale(1.05); }
+        .btn-record:disabled { opacity: 0.4; cursor: not-allowed; transform: none; animation: none; }
+
+        .btn-secondary {
+            background: var(--surface2); color: var(--text);
+            border: 1px solid var(--border);
+        }
+        .btn-secondary:hover { background: var(--border); }
+
+        /* Side panel */
+        .side-panel {
+            width: 360px; flex-shrink: 0;
+            display: flex; flex-direction: column;
+            background: var(--surface);
+            border-radius: var(--radius);
+            border: 1px solid var(--border);
+            overflow: hidden;
+        }
+        .side-header {
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex; align-items: center; justify-content: space-between;
+        }
+        .side-header h2 { font-size: 15px; font-weight: 600; }
+        .side-header .count { font-size: 12px; color: var(--text2); background: var(--surface2); padding: 2px 10px; border-radius: 12px; }
+        .gallery {
+            flex: 1; overflow-y: auto; padding: 12px;
+            display: grid; grid-template-columns: repeat(2, 1fr);
+            gap: 10px; align-content: start;
+        }
+        .gallery::-webkit-scrollbar { width: 5px; }
+        .gallery::-webkit-scrollbar-thumb { background: var(--border); border-radius: 3px; }
+
+        .gallery-empty {
+            grid-column: 1 / -1;
+            display: flex; flex-direction: column; align-items: center; justify-content: center;
+            padding: 40px 20px; color: var(--text2); gap: 10px;
+        }
+        .gallery-empty .icon { font-size: 48px; opacity: 0.3; }
+
+        .gallery-item {
+            position: relative; aspect-ratio: 4/3;
+            border-radius: var(--radius-sm); overflow: hidden;
+            border: 2px solid transparent; cursor: pointer;
+            transition: var(--transition);
+            background: #000;
+        }
+        .gallery-item:hover { border-color: var(--accent); transform: translateY(-2px); }
+        .gallery-item img, .gallery-item video {
+            width: 100%; height: 100%; object-fit: cover;
+        }
+        .gallery-item .type-badge {
+            position: absolute; top: 6px; left: 6px;
+            font-size: 11px; padding: 2px 8px; border-radius: 10px;
+            background: rgba(0,0,0,0.7); color: #fff;
+            backdrop-filter: blur(4px);
+        }
+        .gallery-item .type-badge.video { background: rgba(231,76,60,0.85); }
+        .gallery-item .actions {
+            position: absolute; bottom: 0; left: 0; right: 0;
+            display: flex; gap: 0;
+            opacity: 0; transform: translateY(100%);
+            transition: var(--transition);
+            background: rgba(0,0,0,0.75); backdrop-filter: blur(6px);
+        }
+        .gallery-item:hover .actions { opacity: 1; transform: translateY(0); }
+        .gallery-item .actions button {
+            flex: 1; padding: 8px 4px; border: none;
+            background: transparent; color: #fff; cursor: pointer;
+            font-size: 12px; transition: var(--transition);
+            display: flex; align-items: center; justify-content: center; gap: 4px;
+        }
+        .gallery-item .actions button:hover { background: rgba(255,255,255,0.15); }
+        .gallery-item .actions .btn-delete { color: var(--danger2); }
+
+        /* Modal / Lightbox */
+        .lightbox {
+            position: fixed; inset: 0; z-index: 200;
+            background: rgba(0,0,0,0.9); display: flex; align-items: center; justify-content: center;
+            opacity: 0; pointer-events: none; transition: opacity 0.3s ease;
+        }
+        .lightbox.open { opacity: 1; pointer-events: auto; }
+        .lightbox-content {
+            max-width: 90vw; max-height: 90vh; position: relative;
+        }
+        .lightbox-content img, .lightbox-content video {
+            max-width: 90vw; max-height: 85vh; border-radius: var(--radius-sm);
+            box-shadow: 0 8px 40px rgba(0,0,0,0.6);
+        }
+        .lightbox-close {
+            position: absolute; top: -40px; right: 0;
+            background: rgba(255,255,255,0.15); border: none; color: #fff;
+            width: 36px; height: 36px; border-radius: 50%; cursor: pointer;
+            font-size: 18px; display: flex; align-items: center; justify-content: center;
+            transition: var(--transition);
+        }
+        .lightbox-close:hover { background: rgba(255,255,255,0.3); }
+
+        /* Toast */
+        .toast-container {
+            position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%);
+            z-index: 300; display: flex; flex-direction: column; gap: 8px; align-items: center;
+        }
+        .toast {
+            padding: 10px 20px; border-radius: 20px;
+            background: var(--surface2); color: var(--text);
+            font-size: 13px; box-shadow: var(--shadow);
+            animation: toast-in 0.3s ease, toast-out 0.3s ease 2.2s forwards;
+            pointer-events: none; white-space: nowrap;
+        }
+        @keyframes toast-in { from { opacity: 0; transform: translateY(12px); } to { opacity: 1; transform: translateY(0); } }
+        @keyframes toast-out { from { opacity: 1; } to { opacity: 0; } }
+
+        /* Responsive */
+        @media (max-width: 900px) {
+            .main-container { flex-direction: column; height: auto; padding: 12px; }
+            .side-panel { width: 100%; max-height: 360px; }
+            .video-wrapper { min-height: 260px; }
+            .header h1 { font-size: 14px; }
+            .header-actions .device-count-text { display: none; }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Browser warning banner -->
+    <div id="browserWarning" style="display:none;background:#2d1b1b;border-bottom:2px solid var(--danger);padding:10px 24px;text-align:center;font-size:13px;color:#ff6b6b;">
+        ⚠️ 当前环境可能不支持摄像头访问，请用 <strong style="color:#fff;">Chrome 浏览器</strong> 打开 <code style="background:#000;padding:2px 8px;border-radius:4px;color:#a29bfe;">http://localhost:8080</code>
+    </div>
+
+    <!-- Header -->
+    <header class="header">
+        <div class="header-left">
+            <div class="logo">📷</div>
+            <div>
+                <h1>USB 摄像头</h1>
+                <div style="display:flex;align-items:center;gap:5px;margin-top:1px;">
+                    <span class="status-dot" id="statusDot"></span>
+                    <span class="status-text" id="statusText">正在初始化...</span>
+                </div>
+            </div>
+        </div>
+        <div class="header-actions">
+            <span class="device-count-text" id="deviceCount">检测中...</span>
+            <button class="btn btn-secondary" onclick="clearGallery()" style="font-size:11px;padding:5px 12px;">清空</button>
+        </div>
+    </header>
+
+    <!-- Main -->
+    <div class="main-container">
+        <!-- Video Panel -->
+        <div class="video-panel">
+            <div class="camera-selector">
+                <label>📹 摄像头</label>
+                <select id="cameraSelect">
+                    <option value="">正在扫描摄像头...</option>
+                </select>
+                <button class="btn-refresh" onclick="scanCameras()" title="重新扫描摄像头">🔄</button>
+            </div>
+            <div class="video-wrapper" id="videoWrapper">
+                <video id="video" autoplay playsinline muted></video>
+                <canvas id="canvas" style="display:none;"></canvas>
+                <div class="flash" id="flash"></div>
+                <div class="active-camera-badge" id="activeCameraBadge" style="display:none;">🔌 USB</div>
+                <div class="no-camera-overlay" id="noCameraOverlay">
+                    <div class="icon">📹</div>
+                    <div class="hint" id="noCameraHint">
+                        <span style="font-weight:600;color:var(--accent2);">🔌 自动检测 Type-C USB 摄像头</span><br>
+                        插入后点击 🔄 刷新扫描<br>
+                        <span style="font-size:12px;opacity:0.6;">💡 优先连接 USB 摄像头，请在 Chrome 中打开此页面</span>
+                    </div>
+                </div>
+                <div class="rec-indicator" id="recIndicator">
+                    <span class="rec-dot"></span>
+                    <span class="rec-time" id="recTime">00:00</span>
+                </div>
+            </div>
+            <div class="controls">
+                <button class="btn btn-photo" id="btnPhoto" disabled title="拍照">
+                    📸
+                </button>
+                <button class="btn btn-record" id="btnRecord" disabled title="开始录像">
+                    ⏺️
+                </button>
+            </div>
+        </div>
+
+        <!-- Side Panel -->
+        <div class="side-panel">
+            <div class="side-header">
+                <h2>📁 媒体库</h2>
+                <span class="count" id="galleryCount">0</span>
+            </div>
+            <div class="gallery" id="gallery">
+                <div class="gallery-empty" id="galleryEmpty">
+                    <div class="icon">🎞️</div>
+                    <div>拍摄的照片和视频将显示在这里</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Lightbox -->
+    <div class="lightbox" id="lightbox" onclick="closeLightbox()">
+        <div class="lightbox-content" onclick="event.stopPropagation()">
+            <button class="lightbox-close" onclick="closeLightbox()">✕</button>
+            <div id="lightboxInner"></div>
+        </div>
+    </div>
+
+    <!-- Toast container -->
+    <div class="toast-container" id="toastContainer"></div>
+
+    <script>
+        // ===================== State =====================
+        const state = {
+            cameras: [],
+            activeDeviceId: null,
+            stream: null,
+            mediaRecorder: null,
+            recordedChunks: [],
+            recordingStartTime: null,
+            recordingTimer: null,
+            mediaItems: [] // { id, type: 'photo'|'video', src, blob, timestamp }
+        };
+
+        // DOM refs
+        const video = document.getElementById('video');
+        const canvas = document.getElementById('canvas');
+        const flash = document.getElementById('flash');
+        const cameraSelect = document.getElementById('cameraSelect');
+        const btnPhoto = document.getElementById('btnPhoto');
+        const btnRecord = document.getElementById('btnRecord');
+        const statusDot = document.getElementById('statusDot');
+        const statusText = document.getElementById('statusText');
+        const deviceCount = document.getElementById('deviceCount');
+        const noCameraOverlay = document.getElementById('noCameraOverlay');
+        const recIndicator = document.getElementById('recIndicator');
+        const recTime = document.getElementById('recTime');
+        const gallery = document.getElementById('gallery');
+        const galleryEmpty = document.getElementById('galleryEmpty');
+        const galleryCount = document.getElementById('galleryCount');
+        const lightbox = document.getElementById('lightbox');
+        const lightboxInner = document.getElementById('lightboxInner');
+        const toastContainer = document.getElementById('toastContainer');
+
+        // ===================== Toast =====================
+        function showToast(msg) {
+            const el = document.createElement('div');
+            el.className = 'toast';
+            el.textContent = msg;
+            toastContainer.appendChild(el);
+            setTimeout(() => el.remove(), 2600);
+        }
+
+        // ===================== Camera Scanning =====================
+        async function scanCameras() {
+            try {
+                setStatus('loading', '正在扫描摄像头...');
+                cameraSelect.innerHTML = '<option value="">正在扫描...</option>';
+
+                // First request permission to get full device labels
+                let permStream = null;
+                let permError = null;
+                try {
+                    permStream = await navigator.mediaDevices.getUserMedia({ video: true });
+                } catch (e) {
+                    permError = e;
+                }
+
+                const devices = await navigator.mediaDevices.enumerateDevices();
+                const videoDevices = devices.filter(d => d.kind === 'videoinput');
+
+                if (permStream) {
+                    permStream.getTracks().forEach(t => t.stop());
+                }
+
+                state.cameras = videoDevices.map((d, i) => ({
+                    deviceId: d.deviceId,
+                    label: d.label || `摄像头 ${i + 1}`
+                }));
+
+                // Debug: log all cameras found
+                console.log('[Scan] Cameras found:', state.cameras.map(c =>
+                    `[${getCameraTag(c.label)}] ${c.label} (${c.deviceId})`
+                ));
+
+                updateCameraSelect();
+
+                if (permError && permError.name === 'NotAllowedError') {
+                    setStatus('error', '摄像头权限被拒绝');
+                    deviceCount.textContent = `${videoDevices.length} 台设备 (权限未授予)`;
+                    showToast('⚠️ 请在浏览器地址栏左侧点击锁图标 → 允许摄像头权限');
+                    // Still show devices even if labels are empty
+                    return;
+                }
+
+                if (videoDevices.length === 0) {
+                    setStatus('error', '未检测到摄像头');
+                    deviceCount.textContent = '0 台设备';
+                    showToast('未检测到摄像头，请插入 USB 摄像头后点击 🔄 刷新');
+                } else {
+                    const usbCount = videoDevices.filter(d => {
+                        const label = d.label.toLowerCase();
+                        return label.includes('usb') || label.includes('uvc') || label.includes('webcam') ||
+                            (!label.includes('built-in') && !label.includes('facetime') &&
+                             !label.includes('integrated') && !label.includes('iphone'));
+                    }).length;
+                    deviceCount.textContent = `${videoDevices.length} 台设备 (USB: ${usbCount})`;
+                    setStatus('active', `${videoDevices.length} 台摄像头就绪`);
+                }
+
+            } catch (err) {
+                console.error('Scan error:', err);
+                setStatus('error', '摄像头扫描失败');
+                showToast('扫描失败，请确认已授予浏览器摄像头权限');
+            }
+        }
+
+        function isUSBCamera(label) {
+            const l = label.toLowerCase();
+            // Explicit USB/UVC/WebCam keywords
+            if (l.includes('usb') || l.includes('uvc') || l.includes('webcam') ||
+                l.includes('external') || l.includes('vendorid') || l.includes('productid') ||
+                l.includes('camera vendorid') || l.includes('hd ') && l.includes('cam')) return true;
+            // Any camera that's NOT a known built-in → likely external/USB
+            if (!isBuiltinCamera(label)) return true;
+            return false;
+        }
+
+        function isBuiltinCamera(label) {
+            const l = label.toLowerCase();
+            return l.includes('built-in') || l.includes('facetime') || l.includes('integrated') ||
+                   l.includes('iphone') || l.includes('continuity') || l.includes('内建');
+        }
+
+        function getCameraTag(label) {
+            if (isUSBCamera(label)) return '🔌 USB';
+            if (isBuiltinCamera(label)) return '💻 内置';
+            return '📷 外接';
+        }
+
+        function updateCameraSelect() {
+            // Sort: USB cameras first, then others, built-in last
+            const sorted = [...state.cameras].sort((a, b) => {
+                const aUSB = isUSBCamera(a.label);
+                const bUSB = isUSBCamera(b.label);
+                const aBuiltin = isBuiltinCamera(a.label);
+                const bBuiltin = isBuiltinCamera(b.label);
+                if (aUSB && !bUSB) return -1;
+                if (!aUSB && bUSB) return 1;
+                if (aBuiltin && !bBuiltin) return 1;
+                if (!aBuiltin && bBuiltin) return -1;
+                return 0;
+            });
+
+            cameraSelect.innerHTML = sorted.length === 0
+                ? '<option value="">未检测到摄像头</option>'
+                : sorted.map(c =>
+                    `<option value="${c.deviceId}" ${c.deviceId === state.activeDeviceId ? 'selected' : ''}>${getCameraTag(c.label)} ${c.label}</option>`
+                  ).join('');
+
+            // Auto-select: prefer USB camera
+            if (sorted.length > 0) {
+                const usbCam = sorted.find(c => isUSBCamera(c.label));
+                const preferred = usbCam || sorted[0];
+
+                if (!state.activeDeviceId || state.activeDeviceId !== preferred.deviceId) {
+                    state.activeDeviceId = preferred.deviceId;
+                    cameraSelect.value = preferred.deviceId;
+                    startCamera(preferred.deviceId);
+                }
+            }
+        }
+
+        // ===================== Camera Stream =====================
+        async function startCamera(deviceId) {
+            stopStream();
+
+            setStatus('loading', '正在连接摄像头...');
+
+            // Multiple fallback strategies for the SAME deviceId (never fallback to default camera)
+            const attempts = [
+                // Strategy 1: 1080p
+                {
+                    label: 'USB 1080p',
+                    video: { deviceId: { exact: deviceId }, width: { ideal: 1920 }, height: { ideal: 1080 }, frameRate: { ideal: 30 } },
+                    audio: false, timeout: 8000
+                },
+                // Strategy 2: 720p
+                {
+                    label: 'USB 720p',
+                    video: { deviceId: { exact: deviceId }, width: { ideal: 1280 }, height: { ideal: 720 }, frameRate: { ideal: 30 } },
+                    audio: false, timeout: 8000
+                },
+                // Strategy 3: exact deviceId only, no resolution constraint
+                {
+                    label: 'USB 基础',
+                    video: { deviceId: { exact: deviceId } },
+                    audio: false, timeout: 10000
+                },
+                // Strategy 4: ideal deviceId (not exact, but preferred)
+                {
+                    label: 'USB 备选',
+                    video: { deviceId: { ideal: deviceId } },
+                    audio: false, timeout: 10000
+                }
+            ];
+
+            let lastError = null;
+
+            for (const { label, video: videoConstraints, audio, timeout } of attempts) {
+                try {
+                    console.log(`[Camera] Trying: ${label} (deviceId: ${deviceId})`);
+                    const stream = await promiseWithTimeout(
+                        navigator.mediaDevices.getUserMedia({ video: videoConstraints, audio }),
+                        timeout
+                    );
+
+                    // Verify we got the right device
+                    const track = stream.getVideoTracks()[0];
+                    const actualDeviceId = track.getSettings().deviceId;
+                    const trackLabel = track.label;
+                    console.log(`[Camera] ✅ Got stream: "${trackLabel}" | deviceId: ${actualDeviceId} | ${track.getSettings().width}x${track.getSettings().height}`);
+
+                    state.stream = stream;
+                    video.srcObject = stream;
+                    state.activeDeviceId = deviceId;
+
+                    await new Promise((resolve, reject) => {
+                        const t = setTimeout(() => reject(new Error('视频加载超时')), 5000);
+                        video.onloadedmetadata = () => { clearTimeout(t); resolve(); };
+                        video.onerror = () => { clearTimeout(t); reject(new Error('视频元素错误')); };
+                    });
+
+                    // Show active camera info
+                    const camera = state.cameras.find(c => c.deviceId === deviceId);
+                    const camName = camera ? camera.label : trackLabel;
+                    const tag = getCameraTag(camName);
+                    setStatus('active', `${camName} (${label})`);
+
+                    // Update badge
+                    const badge = document.getElementById('activeCameraBadge');
+                    badge.textContent = tag + ' ' + camName;
+                    badge.style.display = 'block';
+
+                    btnPhoto.disabled = false;
+                    btnRecord.disabled = false;
+                    noCameraOverlay.style.display = 'none';
+                    showToast(`✅ ${getCameraTag(camName)} ${camName}`);
+                    return; // Success!
+
+                } catch (err) {
+                    lastError = err;
+                    console.warn(`[Camera] ❌ ${label} failed:`, err.name, err.message);
+                    stopStream();
+                }
+            }
+
+            // All attempts exhausted - show detailed error
+            console.error('[Camera] All strategies failed. Last error:', lastError);
+            setStatus('error', 'USB摄像头连接失败');
+
+            const camera = state.cameras.find(c => c.deviceId === deviceId);
+            const camName = camera ? camera.label : '未知设备';
+            showToast(`❌ 无法连接 "${camName}"，请确认摄像头未被其他应用占用`);
+            btnPhoto.disabled = true;
+            btnRecord.disabled = true;
+            noCameraOverlay.style.display = '';
+        }
+
+        function promiseWithTimeout(promise, ms) {
+            return Promise.race([
+                promise,
+                new Promise((_, reject) =>
+                    setTimeout(() => reject(new DOMException('操作超时', 'TimeoutError')), ms)
+                )
+            ]);
+        }
+
+        function stopStream() {
+            if (state.stream) {
+                state.stream.getTracks().forEach(track => track.stop());
+                state.stream = null;
+            }
+            document.getElementById('activeCameraBadge').style.display = 'none';
+        }
+
+        function setStatus(type, msg) {
+            statusDot.className = 'status-dot';
+            if (type === 'active') statusDot.classList.add('active');
+            if (type === 'error') statusDot.classList.add('error');
+            statusText.textContent = msg;
+        }
+
+        // ===================== Photo Capture =====================
+        async function takePhoto() {
+            if (!state.stream || !video.videoWidth) {
+                showToast('摄像头未就绪');
+                return;
+            }
+
+            // Flash effect
+            flash.classList.add('active');
+            setTimeout(() => flash.classList.remove('active'), 120);
+
+            // Capture frame
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const ctx = canvas.getContext('2d');
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+            // Convert to blob
+            const blob = await new Promise(resolve => canvas.toBlob(resolve, 'image/jpeg', 0.95));
+            const id = 'photo_' + Date.now();
+            const url = URL.createObjectURL(blob);
+
+            state.mediaItems.unshift({
+                id,
+                type: 'photo',
+                src: url,
+                blob,
+                timestamp: Date.now()
+            });
+
+            renderGallery();
+            showToast('📸 照片已捕获');
+        }
+
+        // ===================== Video Recording =====================
+        async function toggleRecording() {
+            if (state.mediaRecorder && state.mediaRecorder.state === 'recording') {
+                stopRecording();
+            } else {
+                startRecording();
+            }
+        }
+
+        async function startRecording() {
+            if (!state.stream) {
+                showToast('摄像头未就绪');
+                return;
+            }
+
+            try {
+                state.recordedChunks = [];
+                const options = { mimeType: 'video/webm;codecs=vp9' };
+                if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+                    options.mimeType = 'video/webm;codecs=vp8';
+                }
+                if (!MediaRecorder.isTypeSupported(options.mimeType)) {
+                    options.mimeType = 'video/webm';
+                }
+
+                state.mediaRecorder = new MediaRecorder(state.stream, options);
+                state.mediaRecorder.ondataavailable = (e) => {
+                    if (e.data.size > 0) state.recordedChunks.push(e.data);
+                };
+                state.mediaRecorder.onstop = () => {
+                    const blob = new Blob(state.recordedChunks, { type: options.mimeType });
+                    const id = 'video_' + Date.now();
+                    const url = URL.createObjectURL(blob);
+
+                    state.mediaItems.unshift({
+                        id,
+                        type: 'video',
+                        src: url,
+                        blob,
+                        timestamp: Date.now()
+                    });
+
+                    renderGallery();
+                    showToast('🎬 视频已保存');
+                };
+
+                state.mediaRecorder.start();
+                state.recordingStartTime = Date.now();
+                updateRecTime();
+                state.recordingTimer = setInterval(updateRecTime, 200);
+
+                btnRecord.classList.add('recording');
+                btnRecord.textContent = '⏹️';
+                recIndicator.classList.add('visible');
+                btnPhoto.disabled = true;
+                cameraSelect.disabled = true;
+
+                showToast('🔴 开始录像...');
+            } catch (err) {
+                console.error('Recording start error:', err);
+                showToast('录像启动失败');
+            }
+        }
+
+        function stopRecording() {
+            if (state.mediaRecorder && state.mediaRecorder.state === 'recording') {
+                state.mediaRecorder.stop();
+            }
+            if (state.recordingTimer) {
+                clearInterval(state.recordingTimer);
+                state.recordingTimer = null;
+            }
+            btnRecord.classList.remove('recording');
+            btnRecord.textContent = '⏺️';
+            recIndicator.classList.remove('visible');
+            recTime.textContent = '00:00';
+            btnPhoto.disabled = false;
+            cameraSelect.disabled = false;
+        }
+
+        function updateRecTime() {
+            const elapsed = Math.floor((Date.now() - state.recordingStartTime) / 1000);
+            const m = String(Math.floor(elapsed / 60)).padStart(2, '0');
+            const s = String(elapsed % 60).padStart(2, '0');
+            recTime.textContent = `${m}:${s}`;
+        }
+
+        // ===================== Gallery =====================
+        function renderGallery() {
+            if (state.mediaItems.length === 0) {
+                gallery.innerHTML = '';
+                gallery.appendChild(galleryEmpty);
+                galleryEmpty.style.display = '';
+                galleryCount.textContent = '0';
+                return;
+            }
+
+            galleryEmpty.style.display = 'none';
+            galleryCount.textContent = state.mediaItems.length;
+
+            gallery.innerHTML = state.mediaItems.map((item, index) => `
+                <div class="gallery-item" onclick="openLightbox('${item.id}')">
+                    ${item.type === 'photo'
+                        ? `<img src="${item.src}" alt="Photo" loading="lazy">`
+                        : `<video src="${item.src}" muted preload="metadata"></video>`
+                    }
+                    <span class="type-badge ${item.type === 'video' ? 'video' : ''}">${item.type === 'photo' ? '📷' : '🎬'}</span>
+                    <div class="actions" onclick="event.stopPropagation()">
+                        <button onclick="downloadItem('${item.id}')" title="下载">⬇️ 下载</button>
+                        <button class="btn-delete" onclick="deleteItem('${item.id}')" title="删除">🗑️</button>
+                    </div>
+                </div>
+            `).join('');
+        }
+
+        function downloadItem(id) {
+            const item = state.mediaItems.find(m => m.id === id);
+            if (!item) return;
+
+            const a = document.createElement('a');
+            const ext = item.type === 'photo' ? 'jpg' : 'webm';
+            const name = `USB_Cam_${new Date(item.timestamp).toISOString().replace(/[:.]/g, '-')}.${ext}`;
+            a.href = item.src;
+            a.download = name;
+            a.click();
+            showToast('⬇️ 下载中...');
+        }
+
+        function deleteItem(id) {
+            const idx = state.mediaItems.findIndex(m => m.id === id);
+            if (idx === -1) return;
+
+            const item = state.mediaItems[idx];
+            URL.revokeObjectURL(item.src);
+            state.mediaItems.splice(idx, 1);
+            renderGallery();
+            showToast('🗑️ 已删除');
+        }
+
+        function clearGallery() {
+            if (state.mediaItems.length === 0) return;
+            if (!confirm(`确定要清空所有 ${state.mediaItems.length} 个媒体文件吗？`)) return;
+
+            state.mediaItems.forEach(item => URL.revokeObjectURL(item.src));
+            state.mediaItems = [];
+            renderGallery();
+            showToast('媒体库已清空');
+        }
+
+        // ===================== Lightbox =====================
+        function openLightbox(id) {
+            const item = state.mediaItems.find(m => m.id === id);
+            if (!item) return;
+
+            lightboxInner.innerHTML = item.type === 'photo'
+                ? `<img src="${item.src}" alt="Photo">`
+                : `<video src="${item.src}" controls autoplay loop style="max-width:90vw;max-height:85vh;"></video>`;
+            lightbox.classList.add('open');
+
+            document.addEventListener('keydown', onLightboxKey);
+        }
+
+        function closeLightbox() {
+            lightbox.classList.remove('open');
+            lightboxInner.innerHTML = '';
+            document.removeEventListener('keydown', onLightboxKey);
+        }
+
+        function onLightboxKey(e) {
+            if (e.key === 'Escape') closeLightbox();
+        }
+
+        // ===================== Event Listeners =====================
+        cameraSelect.addEventListener('change', () => {
+            const deviceId = cameraSelect.value;
+            if (deviceId && deviceId !== state.activeDeviceId) {
+                state.activeDeviceId = deviceId;
+                startCamera(deviceId);
+            }
+        });
+
+        btnPhoto.addEventListener('click', takePhoto);
+        btnRecord.addEventListener('click', toggleRecording);
+
+        // Keyboard shortcuts
+        document.addEventListener('keydown', (e) => {
+            // Space = photo
+            if (e.code === 'Space' && !e.target.matches('input, select, textarea')) {
+                e.preventDefault();
+                if (!btnPhoto.disabled) takePhoto();
+            }
+            // R = toggle recording
+            if (e.code === 'KeyR' && !e.target.matches('input, select, textarea')) {
+                e.preventDefault();
+                if (!btnRecord.disabled) toggleRecording();
+            }
+        });
+
+        // Listen for device changes
+        navigator.mediaDevices?.addEventListener?.('devicechange', () => {
+            console.log('Device change detected');
+            scanCameras();
+        });
+
+        // Handle page unload
+        window.addEventListener('beforeunload', () => {
+            stopStream();
+            if (state.mediaRecorder && state.mediaRecorder.state === 'recording') {
+                state.mediaRecorder.stop();
+            }
+        });
+
+        // ===================== Init =====================
+        async function init() {
+            // Detect embedded webview
+            const isEmbedded = navigator.webdriver ||
+                (window !== window.parent) ||
+                !navigator.userAgent.includes('Chrome') ||
+                navigator.userAgent.includes('Electron');
+
+            if (isEmbedded) {
+                document.getElementById('browserWarning').style.display = 'block';
+                console.warn('Detected embedded/WebDriver environment - camera access may be limited');
+            }
+
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                setStatus('error', '浏览器不支持摄像头访问');
+                showToast('请使用现代浏览器 (Chrome/Edge/Firefox) 并确保使用 HTTPS 或 localhost');
+                return;
+            }
+            await scanCameras();
+
+            // If no cameras found initially, try again after a short delay
+            if (state.cameras.length === 0) {
+                showToast('等待 USB 摄像头连接...');
+                // Poll for new devices
+                let retries = 0;
+                const pollInterval = setInterval(async () => {
+                    await scanCameras();
+                    retries++;
+                    if (state.cameras.length > 0 || retries >= 10) {
+                        clearInterval(pollInterval);
+                    }
+                }, 2000);
+            }
+        }
+
+        init();
+    </script>
+
+    <!-- Register Service Worker for PWA -->
+    <script>
+        if ('serviceWorker' in navigator) {
+            window.addEventListener('load', () => {
+                navigator.serviceWorker.register('./sw.js')
+                    .then((reg) => console.log('[PWA] Service Worker registered:', reg.scope))
+                    .catch((err) => console.log('[PWA] Service Worker registration failed:', err));
+            });
+        }
+    </script>
+</body>
+</html>
