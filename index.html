@@ -373,11 +373,6 @@
 </head>
 <body>
 
-    <!-- Browser warning banner -->
-    <div id="browserWarning" style="display:none;background:#2d1b1b;border-bottom:2px solid var(--danger);padding:10px 24px;text-align:center;font-size:13px;color:#ff6b6b;">
-        ⚠️ 当前环境可能不支持摄像头访问，请用 <strong style="color:#fff;">Chrome 浏览器</strong> 打开 <code style="background:#000;padding:2px 8px;border-radius:4px;color:#a29bfe;">http://localhost:8080</code>
-    </div>
-
     <!-- Header -->
     <header class="header">
         <div class="header-left">
@@ -417,7 +412,7 @@
                     <div class="hint" id="noCameraHint">
                         <span style="font-weight:600;color:var(--accent2);">🔌 自动检测 Type-C USB 摄像头</span><br>
                         插入后点击 🔄 刷新扫描<br>
-                        <span style="font-size:12px;opacity:0.6;">💡 优先连接 USB 摄像头，请在 Chrome 中打开此页面</span>
+                        <span style="font-size:12px;opacity:0.6;">💡 优先连接 USB 摄像头，建议在 Chrome / Edge / Firefox / Safari 中打开</span>
                     </div>
                 </div>
                 <div class="rec-indicator" id="recIndicator">
@@ -778,6 +773,24 @@
         }
 
         // ===================== Video Recording =====================
+        // Pick a container/codec the current browser actually supports.
+        // Chrome/Edge/Firefox → WebM (VP9/VP8); Safari → MP4 (H.264/QuickTime).
+        function getSupportedMimeType() {
+            const candidates = [
+                'video/webm;codecs=vp9',
+                'video/webm;codecs=vp8',
+                'video/webm',
+                'video/mp4;codecs=h264',
+                'video/mp4',
+                'video/quicktime'
+            ];
+            if (typeof MediaRecorder === 'undefined' || !MediaRecorder.isTypeSupported) return '';
+            for (const type of candidates) {
+                if (MediaRecorder.isTypeSupported(type)) return type;
+            }
+            return ''; // browser will fall back to its own default
+        }
+
         async function toggleRecording() {
             if (state.mediaRecorder && state.mediaRecorder.state === 'recording') {
                 stopRecording();
@@ -794,20 +807,19 @@
 
             try {
                 state.recordedChunks = [];
-                const options = { mimeType: 'video/webm;codecs=vp9' };
-                if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-                    options.mimeType = 'video/webm;codecs=vp8';
-                }
-                if (!MediaRecorder.isTypeSupported(options.mimeType)) {
-                    options.mimeType = 'video/webm';
-                }
+
+                // Detect a recording format actually supported by this browser.
+                // Chrome/Edge/Firefox prefer WebM; Safari only supports MP4 (H.264).
+                const mimeType = getSupportedMimeType();
+                const options = mimeType ? { mimeType } : undefined;
 
                 state.mediaRecorder = new MediaRecorder(state.stream, options);
                 state.mediaRecorder.ondataavailable = (e) => {
                     if (e.data.size > 0) state.recordedChunks.push(e.data);
                 };
                 state.mediaRecorder.onstop = () => {
-                    const blob = new Blob(state.recordedChunks, { type: options.mimeType });
+                    const finalMime = state.mediaRecorder.mimeType || mimeType || 'video/webm';
+                    const blob = new Blob(state.recordedChunks, { type: finalMime });
                     const id = 'video_' + Date.now();
                     const url = URL.createObjectURL(blob);
 
@@ -816,6 +828,7 @@
                         type: 'video',
                         src: url,
                         blob,
+                        mimeType: finalMime,
                         timestamp: Date.now()
                     });
 
@@ -897,7 +910,10 @@
             if (!item) return;
 
             const a = document.createElement('a');
-            const ext = item.type === 'photo' ? 'jpg' : 'webm';
+            let ext = 'jpg';
+            if (item.type === 'video') {
+                ext = (item.mimeType && item.mimeType.includes('mp4')) ? 'mp4' : 'webm';
+            }
             const name = `USB_Cam_${new Date(item.timestamp).toISOString().replace(/[:.]/g, '-')}.${ext}`;
             a.href = item.src;
             a.download = name;
@@ -991,20 +1007,9 @@
 
         // ===================== Init =====================
         async function init() {
-            // Detect embedded webview
-            const isEmbedded = navigator.webdriver ||
-                (window !== window.parent) ||
-                !navigator.userAgent.includes('Chrome') ||
-                navigator.userAgent.includes('Electron');
-
-            if (isEmbedded) {
-                document.getElementById('browserWarning').style.display = 'block';
-                console.warn('Detected embedded/WebDriver environment - camera access may be limited');
-            }
-
             if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
                 setStatus('error', '浏览器不支持摄像头访问');
-                showToast('请使用现代浏览器 (Chrome/Edge/Firefox) 并确保使用 HTTPS 或 localhost');
+                showToast('请使用支持的浏览器 (Chrome / Edge / Firefox / Safari) 并确保在 HTTPS 或 localhost 下打开');
                 return;
             }
             await scanCameras();
