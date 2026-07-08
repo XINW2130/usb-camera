@@ -1,0 +1,18 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- USB Video Class (UVC) devices - class 14 -->
+    <usb-device class="14" />
+    <!-- Common webcam vendor/product pairs -->
+    <!-- Logitech -->
+    <usb-device vendor-id="1133" />
+    <!-- OBSBOT -->
+    <usb-device vendor-id="14707" />
+    <!-- Elgato -->
+    <usb-device vendor-id="4057" />
+    <!-- AVerMedia -->
+    <usb-device vendor-id="7345" />
+    <!-- Microsoft -->
+    <usb-device vendor-id="1118" />
+    <!-- Generic: catch any USB device -->
+    <usb-device />
+</resources>

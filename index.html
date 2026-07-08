@@ -147,6 +147,71 @@
         }
         .btn-refresh:hover { background: var(--accent); border-color: var(--accent); }
         .btn-refresh:active { transform: scale(0.95); }
+        .btn-refresh.active {
+            background: var(--accent); border-color: var(--accent); color: #fff;
+            box-shadow: 0 0 0 3px rgba(108,92,231,0.3);
+        }
+
+        /* USB Detection Panel */
+        .usb-detect-panel {
+            background: var(--surface2);
+            border: 1px solid var(--border);
+            border-radius: var(--radius-sm);
+            padding: 10px 14px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 13px;
+            transition: var(--transition);
+        }
+        .usb-detect-panel.success {
+            border-color: var(--success);
+            background: rgba(0,184,148,0.08);
+        }
+        .usb-detect-panel.warning {
+            border-color: var(--warning);
+            background: rgba(253,203,110,0.08);
+        }
+        .usb-detect-status {
+            flex: 1;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+            min-width: 0;
+        }
+        .usb-detect-status .icon {
+            font-size: 16px;
+            flex-shrink: 0;
+        }
+        .usb-detect-status .text {
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            color: var(--text2);
+        }
+        .usb-detect-panel.success .usb-detect-status .text { color: var(--success); }
+        .usb-detect-panel.warning .usb-detect-status .text { color: var(--warning); }
+        .btn-usb-scan {
+            padding: 6px 14px;
+            background: var(--accent);
+            color: #fff;
+            border: none;
+            border-radius: 16px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            transition: var(--transition);
+            white-space: nowrap;
+            flex-shrink: 0;
+        }
+        .btn-usb-scan:hover { background: var(--accent2); }
+        .btn-usb-scan:active { transform: scale(0.96); }
+        .btn-usb-scan:disabled { opacity: 0.5; cursor: not-allowed; }
+        .btn-usb-scan.scanning { animation: usb-pulse 1.2s infinite; }
+        @keyframes usb-pulse {
+            0%, 100% { box-shadow: 0 0 0 0 rgba(108,92,231,0.6); }
+            50% { box-shadow: 0 0 0 8px rgba(108,92,231,0); }
+        }
 
         .video-wrapper {
             position: relative;
@@ -250,6 +315,46 @@
         }
         .btn-record:hover { transform: scale(1.05); }
         .btn-record:disabled { opacity: 0.4; cursor: not-allowed; transform: none; animation: none; }
+
+        /* Fullscreen button */
+        .btn-fullscreen {
+            position: absolute; bottom: 16px; right: 16px;
+            width: 40px; height: 40px; border-radius: 50%;
+            background: rgba(0,0,0,0.55); backdrop-filter: blur(8px);
+            border: 1px solid rgba(255,255,255,0.15);
+            color: #fff; cursor: pointer;
+            font-size: 18px; display: flex; align-items: center; justify-content: center;
+            transition: var(--transition); z-index: 10;
+            opacity: 0.6;
+        }
+        .btn-fullscreen:hover { opacity: 1; background: rgba(108,92,231,0.6); border-color: var(--accent); }
+        .btn-fullscreen:active { transform: scale(0.92); }
+        /* When in fullscreen, video fills entire screen */
+        .video-wrapper:fullscreen {
+            background: #000; border-radius: 0; border: none;
+            width: 100vw; height: 100vh;
+        }
+        .video-wrapper:fullscreen video {
+            width: 100% !important; height: 100% !important;
+            object-fit: cover !important;
+        }
+        .video-wrapper:fullscreen .btn-fullscreen { bottom: 24px; right: 24px; }
+        .video-wrapper:fullscreen .active-camera-badge { top: 24px; left: 24px; }
+        .video-wrapper:fullscreen .rec-indicator { top: 24px; right: 24px; }
+        .video-wrapper:fullscreen .no-camera-overlay { width: 100%; height: 100%; border-radius: 0; }
+        /* WebKit fullscreen */
+        .video-wrapper:-webkit-full-screen {
+            background: #000; border-radius: 0; border: none;
+            width: 100vw; height: 100vh;
+        }
+        .video-wrapper:-webkit-full-screen video {
+            width: 100% !important; height: 100% !important;
+            object-fit: cover !important;
+        }
+        .video-wrapper:-webkit-full-screen .btn-fullscreen { bottom: 24px; right: 24px; }
+        .video-wrapper:-webkit-full-screen .active-camera-badge { top: 24px; left: 24px; }
+        .video-wrapper:-webkit-full-screen .rec-indicator { top: 24px; right: 24px; }
+        .video-wrapper:-webkit-full-screen .no-camera-overlay { width: 100%; height: 100%; border-radius: 0; }
 
         .btn-secondary {
             background: var(--surface2); color: var(--text);
@@ -401,7 +506,20 @@
                     <option value="">正在扫描摄像头...</option>
                 </select>
                 <button class="btn-refresh" onclick="scanCameras()" title="重新扫描摄像头">🔄</button>
+                <button class="btn-refresh" id="toggleBuiltin" onclick="toggleBuiltinCameras()" title="当前：仅显示外接（点击显示内置）">💻</button>
             </div>
+
+            <!-- USB Hardware Detection Panel -->
+            <div class="usb-detect-panel" id="usbDetectPanel">
+                <div class="usb-detect-status">
+                    <span class="icon" id="usbDetectIcon">🔍</span>
+                    <span class="text" id="usbDetectText">USB 设备检测中...</span>
+                </div>
+                <button class="btn-usb-scan" id="btnUSBDetect" onclick="requestUSBDevice()" title="通过浏览器 WebUSB API 检测外接 USB 摄像头硬件">
+                    🔌 检测 USB
+                </button>
+            </div>
+
             <div class="video-wrapper" id="videoWrapper">
                 <video id="video" autoplay playsinline muted></video>
                 <canvas id="canvas" style="display:none;"></canvas>
@@ -419,6 +537,7 @@
                     <span class="rec-dot"></span>
                     <span class="rec-time" id="recTime">00:00</span>
                 </div>
+                <button class="btn-fullscreen" id="btnFullscreen" onclick="toggleFullscreen()" title="全屏">⛶</button>
             </div>
             <div class="controls">
                 <button class="btn btn-photo" id="btnPhoto" disabled title="拍照">
@@ -466,7 +585,11 @@
             recordedChunks: [],
             recordingStartTime: null,
             recordingTimer: null,
-            mediaItems: [] // { id, type: 'photo'|'video', src, blob, timestamp }
+            mediaItems: [], // { id, type: 'photo'|'video', src, blob, timestamp }
+            hideBuiltin: true, // 默认过滤掉设备自带的内置摄像头
+            usbDevices: [],            // WebUSB 检测到的物理 USB 设备
+            usbMatchedCameras: [],     // 已匹配到媒体设备的 USB 摄像头
+            _usbScanning: false        // USB 扫描进行中标记
         };
 
         // DOM refs
@@ -489,6 +612,12 @@
         const lightboxInner = document.getElementById('lightboxInner');
         const toastContainer = document.getElementById('toastContainer');
 
+        // USB panel refs
+        const usbDetectPanel = document.getElementById('usbDetectPanel');
+        const usbDetectIcon = document.getElementById('usbDetectIcon');
+        const usbDetectText = document.getElementById('usbDetectText');
+        const btnUSBDetect = document.getElementById('btnUSBDetect');
+
         // ===================== Toast =====================
         function showToast(msg) {
             const el = document.createElement('div');
@@ -496,6 +625,233 @@
             el.textContent = msg;
             toastContainer.appendChild(el);
             setTimeout(() => el.remove(), 2600);
+        }
+
+        // ===================== WebUSB Hardware Detection =====================
+        // 常见的 USB 摄像头厂商 VID 映射表
+        const CAMERA_VENDORS = new Map([
+            [0x046d, 'Logitech'], [0x045e, 'Microsoft'], [0x0bda, 'Realtek'],
+            [0x04f2, 'Chicony'], [0x17ef, 'Lenovo'], [0x05a3, 'ARC'],
+            [0x041e, 'Creative'], [0x04e8, 'Samsung'], [0x093a, 'Pixart'],
+            [0x1bcf, 'Sunplus'], [0x05ac, 'Apple'], [0x04ca, 'Lite-On'],
+            [0x2232, 'Silicon Motion'], [0x058f, 'Alcor'], [0x1908, 'GEMBIRD'],
+            [0x1e4e, 'Cubeternet'], [0x0c45, 'Microdia'], [0x05a9, 'OmniVision'],
+            [0xeb1a, 'eMPIA'], [0x06f8, 'Guillemot'], [0x0ac8, 'Z-Star'],
+            [0x0c76, 'JMTek'], [0x1b3f, 'Generalplus'], [0x0b05, 'ASUS'],
+            [0x056e, 'Elecom'], [0x03f0, 'HP'], [0x2bd9, 'Anker'],
+            [0x32ed, 'AverMedia'], [0x1532, 'Razer'], [0x18a5, 'Verenatech'],
+            [0x32f0, 'NexiGo'], [0x328f, 'DEPSTECH'], [0x2b16, 'OBSBOT'],
+            [0x152d, 'JMicron'], [0x04b4, 'Cypress'], [0x05e3, 'Genesys Logic'],
+            [0x1a40, 'Terminus'], [0x2109, 'VIA Labs'], [0x0b95, 'ASIX'],
+            [0x0781, 'SanDisk'], [0x0951, 'Kingston'], [0x13fe, 'Phison'],
+        ]);
+
+        // USB Video Class 接口类码
+        const USB_CLASS_VIDEO = 0x0E;
+
+        function updateUSBPanel() {
+            const usbCount = state.usbDevices.length;
+            const matchedCount = state.usbMatchedCameras.length;
+
+            if (!('usb' in navigator)) {
+                usbDetectPanel.className = 'usb-detect-panel';
+                usbDetectIcon.textContent = 'ℹ️';
+                usbDetectText.textContent = 'WebUSB 不可用，使用摄像头标签检测模式';
+                btnUSBDetect.disabled = true;
+                btnUSBDetect.title = 'WebUSB 仅 Chrome/Edge 支持，且需要 HTTPS';
+                return;
+            }
+
+            if (state._usbScanning) {
+                usbDetectPanel.className = 'usb-detect-panel';
+                usbDetectIcon.textContent = '🔍';
+                usbDetectText.textContent = '正在扫描 USB 设备...';
+                btnUSBDetect.classList.add('scanning');
+                btnUSBDetect.disabled = true;
+            } else if (usbCount > 0 && matchedCount > 0) {
+                usbDetectPanel.className = 'usb-detect-panel success';
+                usbDetectIcon.textContent = '✅';
+                usbDetectText.textContent = `已确认 ${matchedCount} 个 USB 摄像头` +
+                    (usbCount > matchedCount ? `（共 ${usbCount} 个 USB 设备）` : '');
+                btnUSBDetect.classList.remove('scanning');
+                btnUSBDetect.disabled = false;
+                btnUSBDetect.title = '重新检测 USB 设备';
+            } else if (usbCount > 0) {
+                usbDetectPanel.className = 'usb-detect-panel warning';
+                usbDetectIcon.textContent = '⚠️';
+                usbDetectText.textContent = `${usbCount} 个 USB 设备，未匹配到摄像头`;
+                btnUSBDetect.classList.remove('scanning');
+                btnUSBDetect.disabled = false;
+                btnUSBDetect.title = '重新检测 USB 设备';
+            } else {
+                usbDetectPanel.className = 'usb-detect-panel';
+                usbDetectIcon.textContent = '🔍';
+                usbDetectText.textContent = '未检测到 USB 摄像头，点击按钮手动检测';
+                btnUSBDetect.classList.remove('scanning');
+                btnUSBDetect.disabled = false;
+                btnUSBDetect.title = '打开浏览器 USB 设备选择器';
+            }
+        }
+
+        async function detectUSBDevices() {
+            if (!('usb' in navigator)) {
+                console.log('[WebUSB] API 不可用');
+                state.usbDevices = [];
+                updateUSBPanel();
+                return [];
+            }
+
+            state._usbScanning = true;
+            updateUSBPanel();
+
+            try {
+                const devices = await navigator.usb.getDevices();
+                console.log(`[WebUSB] getDevices() 返回 ${devices.length} 个已授权设备`);
+
+                const detected = [];
+
+                for (const device of devices) {
+                    const vid = device.vendorId;
+                    const pid = device.productId;
+                    const vendorName = CAMERA_VENDORS.get(vid) || '';
+                    const productName = device.productName || '';
+                    const manufacturerName = device.manufacturerName || vendorName || '';
+
+                    console.log(`[WebUSB] 设备: ${manufacturerName} ${productName} [VID=0x${vid.toString(16)}, PID=0x${pid.toString(16)}]`);
+
+                    // 判断是否可能是摄像头设备
+                    let isLikelyCamera = !!vendorName;
+                    if (!isLikelyCamera) {
+                        const combinedName = (productName + ' ' + manufacturerName).toLowerCase();
+                        const cameraKeywords = [
+                            'camera', 'cam', 'webcam', 'uvc', 'video', 'capture',
+                            '摄像头', '相机', '镜头', '监控', 'lens', 'imager',
+                            'sensor', 'stream', 'hd pro', 'full hd', '4k', '1080p',
+                            'facetime', 'isight'
+                        ];
+                        isLikelyCamera = cameraKeywords.some(k => combinedName.includes(k));
+                    }
+
+                    // 尝试读取设备配置确认是否为视频类（不会干扰系统驱动）
+                    if (!isLikelyCamera) {
+                        try {
+                            await device.open();
+                            // WebUSB API 中可以通过读取配置描述符判断接口类
+                            // 但 open() 后 selectConfiguration() 可能失败因为设备被系统占用
+                            // 这里只做快速尝试
+                            await device.close();
+                        } catch (e) {
+                            // 设备被系统驱动占用 -> 对 UVC 摄像头来说是正常现象
+                            // 标记为"可能摄像头"
+                            console.log(`[WebUSB] 设备被占用（可能是系统 UVC 驱动）: ${e.message}`);
+                            if (!vendorName && productName) {
+                                isLikelyCamera = true; // 系统已占用，很可能是摄像头
+                            }
+                        }
+                    }
+
+                    detected.push({
+                        vendorId: vid,
+                        productId: pid,
+                        productName: productName || `${vendorName || '未知厂商'} USB 设备`,
+                        manufacturerName: manufacturerName || vendorName || 'Unknown',
+                        serialNumber: device.serialNumber || '',
+                        isLikelyCamera
+                    });
+                }
+
+                // 排序：摄像头优先
+                detected.sort((a, b) => (b.isLikelyCamera ? 1 : 0) - (a.isLikelyCamera ? 1 : 0));
+                state.usbDevices = detected;
+
+                const likelyCount = detected.filter(d => d.isLikelyCamera).length;
+                console.log(`[WebUSB] 检测到 ${detected.length} 个 USB 设备，其中 ${likelyCount} 个可能是摄像头`);
+
+            } catch (err) {
+                console.warn('[WebUSB] 检测异常:', err);
+                state.usbDevices = [];
+            }
+
+            state._usbScanning = false;
+            return state.usbDevices;
+        }
+
+        async function requestUSBDevice() {
+            if (!('usb' in navigator)) {
+                showToast('⚠️ 当前浏览器不支持 WebUSB，请使用 Chrome/Edge 并确保 HTTPS 连接');
+                return;
+            }
+
+            state._usbScanning = true;
+            updateUSBPanel();
+
+            try {
+                showToast('🔍 正在打开 USB 设备选择器...');
+                const device = await navigator.usb.requestDevice({ filters: [] });
+
+                if (device) {
+                    const vid = device.vendorId;
+                    const vendorName = CAMERA_VENDORS.get(vid) || '';
+                    const productName = device.productName || `${vendorName || '未知'} USB 摄像头`;
+
+                    console.log(`[WebUSB] 用户选择了: ${productName} [VID=0x${vid.toString(16)}]`);
+                    showToast(`✅ 已授权 USB 设备: ${productName}`);
+
+                    // 重新检测并匹配
+                    await detectUSBDevices();
+                    await scanCameras();
+                }
+            } catch (err) {
+                if (err.name === 'NotFoundError' || err.name === 'AbortError') {
+                    console.log('[WebUSB] 用户取消了设备选择');
+                } else {
+                    console.error('[WebUSB] requestDevice 错误:', err);
+                    showToast('❌ USB 设备选择失败');
+                }
+            } finally {
+                state._usbScanning = false;
+                updateUSBPanel();
+            }
+        }
+
+        // 将 WebUSB 检测到的设备与媒体设备做交叉匹配
+        function matchUSBToMediaDevices(mediaCameras) {
+            state.usbMatchedCameras = [];
+
+            if (state.usbDevices.length === 0 || mediaCameras.length === 0) return;
+
+            for (const usbDev of state.usbDevices) {
+                if (!usbDev.isLikelyCamera) continue;
+
+                const usbNames = [
+                    usbDev.manufacturerName,
+                    usbDev.productName,
+                    CAMERA_VENDORS.get(usbDev.vendorId) || ''
+                ].map(s => s.toLowerCase()).filter(s => s.length > 1);
+
+                for (const cam of mediaCameras) {
+                    if (cam._usbConfirmed) continue; // 已确认，跳过
+
+                    const camLabel = (cam.label || '').toLowerCase();
+
+                    // 尝试按厂商名/产品名匹配
+                    const matched = usbNames.some(name =>
+                        name.length > 2 && camLabel.includes(name)
+                    );
+
+                    if (matched) {
+                        cam._usbConfirmed = true;
+                        cam._usbVendor = usbDev.manufacturerName || CAMERA_VENDORS.get(usbDev.vendorId) || '';
+                        cam._usbProduct = usbDev.productName || '';
+                        state.usbMatchedCameras.push(cam);
+                        console.log(`[Match] ✅ USB 确认: "${cam.label}" ↔ ${usbDev.manufacturerName} ${usbDev.productName}`);
+                        break;
+                    }
+                }
+            }
+
+            console.log(`[Match] ${state.usbMatchedCameras.length}/${mediaCameras.length} 台摄像头已确认 USB 连接`);
+            updateUSBPanel();
         }
 
         // ===================== Camera Scanning =====================
@@ -525,9 +881,16 @@
                     label: d.label || `摄像头 ${i + 1}`
                 }));
 
+                // 并行：通过 WebUSB 检测物理 USB 设备
+                const usbPromise = detectUSBDevices();
+
+                // 等待 USB 检测完成后做交叉匹配
+                await usbPromise;
+                matchUSBToMediaDevices(state.cameras);
+
                 // Debug: log all cameras found
                 console.log('[Scan] Cameras found:', state.cameras.map(c =>
-                    `[${getCameraTag(c.label)}] ${c.label} (${c.deviceId})`
+                    `[${getCameraTag(c)}] ${c.label} (${c.deviceId})`
                 ));
 
                 updateCameraSelect();
@@ -562,38 +925,65 @@
             }
         }
 
-        function isUSBCamera(label) {
-            const l = label.toLowerCase();
-            // Explicit USB/UVC/WebCam keywords
-            if (l.includes('usb') || l.includes('uvc') || l.includes('webcam') ||
-                l.includes('external') || l.includes('vendorid') || l.includes('productid') ||
-                l.includes('camera vendorid') || l.includes('hd ') && l.includes('cam')) return true;
-            // Any camera that's NOT a known built-in → likely external/USB
-            if (!isBuiltinCamera(label)) return true;
+        // Explicit signals that a camera is part of the device (built-in).
+        // Conservative: only flag clear built-in markers to avoid dropping a
+        // real external camera by mistake.
+        // Accepts a camera object: { label, facingMode }
+        function isBuiltinCamera(cam) {
+            const l = (cam && cam.label ? cam.label : '').toLowerCase();
+            const builtinKeywords = [
+                'built-in', 'builtin', 'facetime', 'isight', 'integrated',
+                'iphone', 'ipad', 'continuity', '内建', '内置',
+                'hd webcam', 'integrated webcam', 'easycamera',
+                'truevision', 'front camera', 'rear camera'
+            ];
+            if (builtinKeywords.some(k => l.includes(k))) return true;
+            // A camera reported by the OS as facing 'user'/'environment' is
+            // almost always a built-in/mobile camera, never a USB-C external.
+            const fm = cam && cam.facingMode;
+            if (fm === 'user' || fm === 'environment') return true;
             return false;
         }
 
-        function isBuiltinCamera(label) {
-            const l = label.toLowerCase();
-            return l.includes('built-in') || l.includes('facetime') || l.includes('integrated') ||
-                   l.includes('iphone') || l.includes('continuity') || l.includes('内建');
+        function isUSBCamera(cam) {
+            const l = (cam && cam.label ? cam.label : '').toLowerCase();
+            if (l.includes('usb') || l.includes('uvc') || l.includes('external') ||
+                l.includes('vendorid') || l.includes('productid')) return true;
+            if (!isBuiltinCamera(cam)) return true;
+            return false;
         }
 
-        function getCameraTag(label) {
-            if (isUSBCamera(label)) return '🔌 USB';
-            if (isBuiltinCamera(label)) return '💻 内置';
-            return '📷 外接';
+        function getCameraTag(cam) {
+            if (cam._usbConfirmed) return '✅ USB';
+            if (isBuiltinCamera(cam)) return '💻 内置';
+            if (isUSBCamera(cam)) return '🔌 外接';
+            return '📷 摄像头';
         }
 
         function updateCameraSelect() {
-            // Sort: USB cameras first, then others, built-in last
-            const sorted = [...state.cameras].sort((a, b) => {
-                const aUSB = isUSBCamera(a.label);
-                const bUSB = isUSBCamera(b.label);
-                const aBuiltin = isBuiltinCamera(a.label);
-                const bBuiltin = isBuiltinCamera(b.label);
-                if (aUSB && !bUSB) return -1;
-                if (!aUSB && bUSB) return 1;
+            // Apply built-in filter (when enabled)
+            let list = state.cameras;
+            let filtered = false;
+            if (state.hideBuiltin) {
+                const remaining = state.cameras.filter(c => !isBuiltinCamera(c));
+                // Safety: if filtering removes everything, show all so the app
+                // never ends up with zero usable cameras.
+                if (remaining.length > 0) {
+                    list = remaining;
+                    filtered = true;
+                } else if (state.cameras.length > 0) {
+                    showToast('未检测到外接摄像头，已显示全部');
+                }
+            }
+
+            // Sort: USB-confirmed first, then external/USB, built-in last
+            const sorted = [...list].sort((a, b) => {
+                const aUSB = a._usbConfirmed ? 1 : 0;
+                const bUSB = b._usbConfirmed ? 1 : 0;
+                if (aUSB !== bUSB) return bUSB - aUSB; // USB confirmed first
+
+                const aBuiltin = isBuiltinCamera(a);
+                const bBuiltin = isBuiltinCamera(b);
                 if (aBuiltin && !bBuiltin) return 1;
                 if (!aBuiltin && bBuiltin) return -1;
                 return 0;
@@ -602,13 +992,14 @@
             cameraSelect.innerHTML = sorted.length === 0
                 ? '<option value="">未检测到摄像头</option>'
                 : sorted.map(c =>
-                    `<option value="${c.deviceId}" ${c.deviceId === state.activeDeviceId ? 'selected' : ''}>${getCameraTag(c.label)} ${c.label}</option>`
+                    `<option value="${c.deviceId}" ${c.deviceId === state.activeDeviceId ? 'selected' : ''}>${getCameraTag(c)} ${c.label}</option>`
                   ).join('');
 
-            // Auto-select: prefer USB camera
+            // Auto-select: prefer USB-confirmed external camera, then any external, then first
             if (sorted.length > 0) {
-                const usbCam = sorted.find(c => isUSBCamera(c.label));
-                const preferred = usbCam || sorted[0];
+                const preferred = sorted.find(c => c._usbConfirmed && !isBuiltinCamera(c)) ||
+                               sorted.find(c => !isBuiltinCamera(c)) ||
+                               sorted[0];
 
                 if (!state.activeDeviceId || state.activeDeviceId !== preferred.deviceId) {
                     state.activeDeviceId = preferred.deviceId;
@@ -616,6 +1007,27 @@
                     startCamera(preferred.deviceId);
                 }
             }
+
+            // Update header count to reflect what's shown
+            if (filtered) {
+                const builtin = state.cameras.length - list.length;
+                deviceCount.textContent = `外接 ${list.length} / 共 ${state.cameras.length}`;
+                deviceCount.title = `已隐藏 ${builtin} 个内置摄像头`;
+            } else {
+                deviceCount.textContent = `${state.cameras.length} 台设备`;
+                deviceCount.title = '';
+            }
+        }
+
+        function toggleBuiltinCameras() {
+            state.hideBuiltin = !state.hideBuiltin;
+            const btn = document.getElementById('toggleBuiltin');
+            btn.classList.toggle('active', !state.hideBuiltin);
+            btn.title = state.hideBuiltin ? '当前：仅显示外接（点击显示内置）' : '当前：显示全部（点击仅显示外接）';
+            // Reset active selection so re-scan picks the right default
+            state.activeDeviceId = null;
+            updateCameraSelect();
+            showToast(state.hideBuiltin ? '已隐藏内置摄像头' : '已显示全部摄像头');
         }
 
         // ===================== Camera Stream =====================
@@ -666,7 +1078,12 @@
                     const track = stream.getVideoTracks()[0];
                     const actualDeviceId = track.getSettings().deviceId;
                     const trackLabel = track.label;
-                    console.log(`[Camera] ✅ Got stream: "${trackLabel}" | deviceId: ${actualDeviceId} | ${track.getSettings().width}x${track.getSettings().height}`);
+                    const trackSettings = track.getSettings();
+                    console.log(`[Camera] ✅ Got stream: "${trackLabel}" | deviceId: ${actualDeviceId} | ${trackSettings.width}x${trackSettings.height} | facingMode: ${trackSettings.facingMode || '(none)'}`);
+
+                    // Record facingMode so built-in detection is more accurate
+                    const camObj = state.cameras.find(c => c.deviceId === deviceId);
+                    if (camObj) camObj.facingMode = trackSettings.facingMode || '';
 
                     state.stream = stream;
                     video.srcObject = stream;
@@ -681,7 +1098,7 @@
                     // Show active camera info
                     const camera = state.cameras.find(c => c.deviceId === deviceId);
                     const camName = camera ? camera.label : trackLabel;
-                    const tag = getCameraTag(camName);
+                    const tag = getCameraTag(camera || { label: trackLabel });
                     setStatus('active', `${camName} (${label})`);
 
                     // Update badge
@@ -692,7 +1109,7 @@
                     btnPhoto.disabled = false;
                     btnRecord.disabled = false;
                     noCameraOverlay.style.display = 'none';
-                    showToast(`✅ ${getCameraTag(camName)} ${camName}`);
+                    showToast(`✅ ${getCameraTag(camera || { label: trackLabel })} ${camName}`);
                     return; // Success!
 
                 } catch (err) {
@@ -977,6 +1394,53 @@
         btnPhoto.addEventListener('click', takePhoto);
         btnRecord.addEventListener('click', toggleRecording);
 
+        // Fullscreen toggle
+        async function toggleFullscreen() {
+            const wrapper = document.getElementById('videoWrapper');
+            const btn = document.getElementById('btnFullscreen');
+            if (!document.fullscreenElement && !document.webkitFullscreenElement) {
+                // Enter fullscreen
+                if (wrapper.requestFullscreen) {
+                    await wrapper.requestFullscreen();
+                } else if (wrapper.webkitRequestFullscreen) {
+                    wrapper.webkitRequestFullscreen();
+                }
+                // Lock to landscape
+                try {
+                    await screen.orientation.lock('landscape');
+                } catch (e) {
+                    // Orientation lock may not be supported
+                }
+            } else {
+                // Unlock orientation before exit
+                try {
+                    await screen.orientation.unlock();
+                } catch (e) {}
+                // Exit fullscreen
+                if (document.exitFullscreen) {
+                    await document.exitFullscreen();
+                } else if (document.webkitExitFullscreen) {
+                    document.webkitExitFullscreen();
+                }
+            }
+        }
+
+        // Update fullscreen button icon on fullscreen change
+        function onFullscreenChange() {
+            const btn = document.getElementById('btnFullscreen');
+            if (document.fullscreenElement || document.webkitFullscreenElement) {
+                btn.textContent = '✕';
+                btn.title = '退出全屏';
+            } else {
+                btn.textContent = '⛶';
+                btn.title = '全屏';
+                // Ensure orientation is unlocked when exiting via Esc
+                try { screen.orientation.unlock(); } catch (e) {}
+            }
+        }
+        document.addEventListener('fullscreenchange', onFullscreenChange);
+        document.addEventListener('webkitfullscreenchange', onFullscreenChange);
+
         // Keyboard shortcuts
         document.addEventListener('keydown', (e) => {
             // Space = photo
@@ -997,6 +1461,23 @@
             scanCameras();
         });
 
+        // WebUSB Hotplug: detect when USB devices are plugged in / removed
+        if ('usb' in navigator) {
+            navigator.usb.addEventListener('connect', async (e) => {
+                console.log('[WebUSB] 🔌 USB 设备已连接:', e.device.productName);
+                showToast(`🔌 USB 设备已连接: ${e.device.productName || '未知设备'}`);
+                await detectUSBDevices();
+                await scanCameras();
+            });
+
+            navigator.usb.addEventListener('disconnect', async (e) => {
+                console.log('[WebUSB] 🔌 USB 设备已断开:', e.device.productName);
+                showToast(`🔌 USB 设备已断开: ${e.device.productName || '未知设备'}`);
+                await detectUSBDevices();
+                await scanCameras();
+            });
+        }
+
         // Handle page unload
         window.addEventListener('beforeunload', () => {
             stopStream();
@@ -1012,6 +1493,10 @@
                 showToast('请使用支持的浏览器 (Chrome / Edge / Firefox / Safari) 并确保在 HTTPS 或 localhost 下打开');
                 return;
             }
+
+            // 初始化 USB 面板
+            updateUSBPanel();
+
             await scanCameras();
 
             // If no cameras found initially, try again after a short delay
